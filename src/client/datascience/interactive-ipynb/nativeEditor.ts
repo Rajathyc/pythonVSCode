@@ -45,6 +45,7 @@ import {
     IThemeFinder,
     WebViewViewChangeEventArgs
 } from '../types';
+import { NativeEditorSynchronizer } from './nativeEditorSynchronizer';
 
 // tslint:disable-next-line: no-require-imports
 import cloneDeep = require('lodash/cloneDeep');
@@ -63,7 +64,6 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
     private startupTimer: StopWatch = new StopWatch();
     private loadedAllCells: boolean = false;
     private _model: INotebookModel | undefined;
-
     constructor(
         @multiInject(IInteractiveWindowListener) listeners: IInteractiveWindowListener[],
         @inject(ILiveShareApi) liveShare: ILiveShareApi,
@@ -81,6 +81,7 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
         @inject(ICommandManager) commandManager: ICommandManager,
         @inject(INotebookExporter) jupyterExporter: INotebookExporter,
         @inject(IWorkspaceService) workspaceService: IWorkspaceService,
+        @inject(NativeEditorSynchronizer) private readonly synchronizer: NativeEditorSynchronizer,
         @inject(INotebookEditorProvider) private editorProvider: INotebookEditorProvider,
         @inject(IDataViewerProvider) dataExplorerProvider: IDataViewerProvider,
         @inject(IJupyterVariables) jupyterVariables: IJupyterVariables,
@@ -120,6 +121,8 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
             ViewColumn.Active,
             experimentsManager
         );
+
+        this.synchronizer.subscribeToUserActions(this, this.postMessage.bind(this));
     }
 
     public get visible(): boolean {
@@ -190,6 +193,10 @@ export class NativeEditor extends InteractiveBase implements INotebookEditor {
     public onMessage(message: string, payload: any) {
         super.onMessage(message, payload);
         switch (message) {
+            case InteractiveWindowMessages.Sync:
+                this.synchronizer.notifyUserAction(payload, this);
+                break;
+
             case InteractiveWindowMessages.ReExecuteCell:
                 this.executedEvent.fire(this);
                 break;
